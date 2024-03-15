@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { QueryRunner, Repository } from 'typeorm';
 import PublicFile from './publicFile.entity';
 import { S3 } from 'aws-sdk';
 import { ConfigService } from '@nestjs/config';
@@ -49,5 +49,22 @@ export class FilesService {
       // Handle the case when the file with the given fileId is not found
       throw new Error(`File with id ${fileId} not found.`);
     }
+  }
+
+  async deletePublicFileWithQueryRunner(
+    fileId: number,
+    queryRunner: QueryRunner,
+  ) {
+    const file = await queryRunner.manager.findOneBy(PublicFile, {
+      id: fileId,
+    });
+    const s3 = new S3();
+    await s3
+      .deleteObject({
+        Bucket: this.configService.get('AWS_PUBLIC_BUCKET_NAME'),
+        Key: file.key,
+      })
+      .promise();
+    await queryRunner.manager.delete(PublicFile, fileId);
   }
 }
